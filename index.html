@@ -1,0 +1,197 @@
+<html lang="en">
+    <head>
+        <meta charset=utf-8/>
+        <!-- CSS only -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+        <style type="text/css">
+        .invisible{
+            display: none;
+        }
+    </style>
+    </head>
+    <script src="//cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script>
+    if (Hls.isSupported()) {
+        console.log('hello hls.js!');
+    }
+    </script>
+    <body>
+        <div id='player'>
+            <h2>Source URL</h2>
+            <p>Enter video URL</p>
+            <input type="text" placeholder="Enter video URL" id="video_url"></input>
+            <button type="button" id="video_url_btn">Play video from URL</button> 
+            
+            <h2>Select video from list</h2>
+            <select name="video_list" id="video_list">
+                <option value="playlists/crab/master-crab.m3u8">Crab</option>
+                <option value="playlists/watermelon/master-watermelon.m3u8">Watermelon</option>
+                <option value="playlists/kiwi/master-kiwi.m3u8">Kiwi</option>
+            </select>
+            <button type="button" id="video_list_btn">Play video from list</button> 
+            
+            <h2>Quality Control</h2>
+            <div id="qdiv"></div>
+            
+            <h2>Video information</h2>
+            <div id="idiv" class="invisible">
+                Bitrate: 
+                <p id="i-bitrate"></p>
+                Height: 
+                <p id="i-height"></p>
+                Width: 
+                <p id="i-width"></p>
+                Video codec:
+                <p id="i-video-codec"></p>
+                Audio codec: 
+                <p id="i-audio-codec"></p>
+            </div>
+            
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-8">
+                        <video id="video" controls muted width=800>0</video>
+                    </div>
+                    <div class="col-md-4">
+                        <div id="urldiv" class="overflow-auto border border-primary" style="width: 400; height:400">
+                        </div>
+                        <div><button type="button" class="btn btn-primary" id="clear-btn">Clear</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+                <script>
+                function changeResolution(lvl){
+                     alert(lvl);
+                }
+                </script>
+                
+                <script>
+                    var hls = new Hls({autoStartLoad : false});
+                    document.getElementById('video_url_btn').onclick = function(){
+                        video_url = document.getElementById('video_url').value;
+                        hls.loadSource(video_url);
+                        playVideo(video_url);
+                    };
+                    
+                    document.getElementById('video_list_btn').onclick = function(){
+                        video_url = document.getElementById('video_list').value;
+                        hls.loadSource(video_url);
+                        playVideo(video_url);
+                    };
+                    document.getElementById('clear-btn').onclick = function(){
+                        document.getElementById("urldiv").innerHTML = "";
+                    };
+                </script>
+				
+				<script>
+				function playVideo(video_url){
+					if (Hls.isSupported()) {
+						var video = document.getElementById('video');
+						
+						var isPlaying = video.currentTime > 0 && !video.paused && !video.ended 
+                        && video.readyState > video.HAVE_CURRENT_DATA;
+                        
+						// bind them together
+						if(!isPlaying) {
+                            hls.attachMedia(video); 
+						}
+                        
+						// MEDIA_ATTACHED event is fired by hls object once MediaSource is ready
+						hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+							console.log('video and hls.js are now bound together !');
+							hls.loadSource(video_url);
+							hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+								console.log(
+								'manifest loaded, found ' + data.levels.length + ' quality level'
+								);
+								
+								var qdiv = document.getElementById("qdiv");
+								qdiv.innerHTML = '';
+								
+								document.getElementById("idiv").classList.remove("invisible");
+								document.getElementById("idiv").classList.remove("invisible");
+								
+								for(var i = 0; i < data.levels.length; i++)
+								{
+									var res = data.levels[i].width + "x" + data.levels[i].height;
+									var btn = document.createElement("button");
+									btn.innerHTML = res;
+									btn.onclick = function(arg){
+                                        return function(){
+                                            var quality_lvl = this.id;
+                                            hls.currentLevel = quality_lvl;
+                                            hls.startLoad()
+                                            
+                                            btns = document.getElementById('qdiv').getElementsByTagName('button');
+                                            for (const b of btns) {
+                                                b.setAttribute("class", "btn btn-primary");
+                                            }
+                                            this.setAttribute("class", "btn btn-success");
+                                        };
+									}(i);
+									btn.setAttribute("type", "button");
+									btn.setAttribute("class", "btn btn-primary");
+									if(i == data.levels.length-1) {btn.setAttribute("class", "btn btn-success");}
+									btn.setAttribute("name", res);
+									btn.setAttribute("id", i);
+									qdiv.appendChild(btn);	
+								}
+							});
+						});
+						
+						hls.on(Hls.Events.LEVEL_SWITCHING, (event, data) => {
+                            console.log('LEVEL_SWITCHING', data);
+                            document.getElementById('i-bitrate').innerHTML = data.bitrate;
+                            document.getElementById('i-width').innerHTML = data.width;
+                            document.getElementById('i-height').innerHTML = data.height;
+                            document.getElementById('i-video-codec').innerHTML = data.videoCodec;
+                            document.getElementById('i-audio-codec').innerHTML = data.audioCodec;
+                        });
+                        
+                        urldiv = document.getElementById("urldiv");
+                        hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
+                            urldiv.innerHTML = urldiv.innerHTML + data.frag.url + "</br>";
+                            urldiv.scrollTop = urldiv.scrollHeight;
+                            //console.log(JSON.stringify(data));
+                        });
+						
+						hls.on(Hls.Events.MANIFEST_PARSED,function() {
+                            hls.loadLevel = -1;
+                            hls.startLoad();
+							video.play();
+						});
+						
+						hls.on(Hls.Events.ERROR, function (event, data) {
+							if (data.fatal) {
+								switch (data.type) {
+								case Hls.ErrorTypes.NETWORK_ERROR:
+									// try to recover network error
+									console.log('fatal network error encountered, try to recover');
+									hls.startLoad();
+									break;
+								case Hls.ErrorTypes.MEDIA_ERROR:
+									console.log('fatal media error encountered, try to recover');
+									hls.recoverMediaError();
+									break;
+								default:
+									// cannot recover
+									hls.destroy();
+									break;
+								}
+							}
+						});
+					}
+					else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+						video.src = video_url;
+						video.addEventListener('loadedmetadata',function() {
+							video.play();
+						});
+					}
+				}
+				</script>
+        </div>
+    </body>
+</html>
